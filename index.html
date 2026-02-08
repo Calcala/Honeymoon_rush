@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Honeymoon Rush</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="game-container">
+
+        <!-- HUB SCREEN -->
+        <section id="hub" class="screen active">
+
+            <img src="assets/hub_bg.png" alt="Rooftop Bar" class="hub-bg">
+
+            <div class="hub-overlay">
+                <!-- Speech Bubble -->
+                <div class="speech-bubble" id="hub-dialog">
+                    <!-- Text inserted via JS -->
+                </div>
+
+                <!-- Door Hitboxes – positioned via JS to match door locations in hub_bg.png -->
+                <button class="door-hitbox" id="door-broadway" data-game="broadway" data-img-x1="29" data-img-x2="35"
+                    data-img-y1="77" data-img-y2="83" aria-label="Jugar Broadway">
+                    <span class="hitbox-glow" style="--glow-color: #d946ef;"></span>
+                    <img src="assets/key.png" class="status-icon hidden" alt="Key">
+                </button>
+
+                <button class="door-hitbox" id="door-taxi" data-game="taxi" data-img-x1="47" data-img-x2="53"
+                    data-img-y1="77" data-img-y2="83" aria-label="Jugar Taxi">
+                    <span class="hitbox-glow" style="--glow-color: #fbbf24;"></span>
+                    <img src="assets/key.png" class="status-icon hidden" alt="Key">
+                </button>
+
+                <button class="door-hitbox" id="door-park" data-game="park" data-img-x1="64" data-img-x2="70"
+                    data-img-y1="77" data-img-y2="83" aria-label="Jugar Central Park">
+                    <span class="hitbox-glow" style="--glow-color: #4ade80;"></span>
+                    <img src="assets/key.png" class="status-icon hidden" alt="Key">
+                </button>
+
+                <!-- Debug Reset Button -->
+                <button id="debug-reset-btn" class="dev-btn"
+                    style="position: absolute; top: 10px; left: 10px; z-index: 100; font-size: 0.7rem; padding: 0.5rem; margin: 0; opacity: 0.7;">
+                    ⚠ RESET
+                </button>
+
+            </div>
+            <audio id="bgm-hub" src="sounds/hub-bg-music.mp3" loop preload="auto"></audio>
+        </section>
+
+        <!-- BROADWAY MINIGAME SCREEN -->
+        <section id="broadway" class="screen broadway-screen">
+            <!-- Top Half: Background Image with integrated header -->
+            <div class="broadway-top">
+                <img src="./assets/broadway_bg.png" alt="Broadway Theater" class="broadway-bg">
+                <header class="broadway-header">
+                    <button class="back-btn" data-target="hub">← Volver</button>
+                </header>
+            </div>
+
+            <!-- Bottom Half: Game Controls -->
+            <div class="broadway-bottom">
+                <!-- Animated Marquee Lights -->
+                <div class="marquee-lights-bar">
+                    <span class="light"></span><span class="light"></span><span class="light"></span>
+                    <span class="light"></span><span class="light"></span><span class="light"></span>
+                    <span class="light"></span><span class="light"></span><span class="light"></span>
+                    <span class="light"></span><span class="light"></span><span class="light"></span>
+                </div>
+
+                <div class="broadway-container">
+                    <div class="marquee">
+                        <div class="marquee-text" id="broadway-message">WATCH!</div>
+                        <div class="level-indicator">LEVEL <span id="broadway-level">1</span>/5</div>
+                    </div>
+
+                    <div class="button-grid">
+                        <button class="game-btn red" data-color="red"></button>
+                        <button class="game-btn blue" data-color="blue"></button>
+                        <button class="game-btn yellow" data-color="yellow"></button>
+                        <button class="game-btn green" data-color="green"></button>
+                    </div>
+                </div>
+
+                <!-- Audio -->
+                <audio id="sfx-button" src="sounds/simon-button-touch.mp3" preload="auto"></audio>
+                <audio id="bgm-broadway" src="sounds/simon-bg-music.mp3" loop preload="auto"></audio>
+            </div>
+        </section>
+
+        <!-- TAXI MINIGAME SCREEN -->
+        <section id="taxi" class="screen taxi-screen">
+            <canvas id="taxi-canvas" class="taxi-canvas"></canvas>
+            <div class="taxi-hud">
+                <button class="back-btn taxi-back" data-target="hub">← Volver</button>
+                <div class="taxi-timer">
+                    <span class="timer-label">TIEMPO</span>
+                    <span id="taxi-time" class="timer-value">30</span>
+                </div>
+            </div>
+            <div id="taxi-message" class="taxi-message hidden"></div>
+            <div id="taxi-countdown" class="taxi-countdown hidden" aria-live="polite"></div>
+            <audio id="bgm-taxi" src="sounds/taxi-bg-music.mp3" loop preload="auto"></audio>
+        </section>
+
+        <!-- PARK MINIGAME SCREEN -->
+        <section id="park" class="screen park-screen">
+            <canvas id="park-canvas" class="park-canvas"></canvas>
+            <div class="park-hud">
+                <button class="back-btn park-back" data-target="hub">← Volver</button>
+                <div class="park-score">
+                    <span class="score-label">OBJETOS</span>
+                    <span id="park-score-val" class="score-value">0/10</span>
+                </div>
+            </div>
+            <div id="park-message" class="park-message hidden"></div>
+            <div id="park-instructions" class="park-instructions hidden">
+                <p>Toque para SALTAR</p>
+                <p>Evita ardillas y ciclistas</p>
+                <p>Recoge globos y pretzels</p>
+            </div>
+            <audio id="bgm-park" src="sounds/park-bg-music.mp3" loop preload="auto"></audio>
+        </section>
+
+        <!-- FINAL REVEAL SCREEN -->
+        <section id="final" class="screen">
+            <header class="screen-header">
+                <h2>🎉 ¡Felicidades!</h2>
+            </header>
+            <main class="final-content">
+                <div class="placeholder-art">Reveal Animation</div>
+                <p class="reveal-message">¡Has desbloqueado el destino secreto!</p>
+            </main>
+        </section>
+
+    </div>
+
+    <script src="main.js"></script>
+</body>
+
+</html>
