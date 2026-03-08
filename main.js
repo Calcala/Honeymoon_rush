@@ -1117,14 +1117,16 @@ const ParkGame = {
     baseSpawnInterval: 120,
 
     // Physics
-    gravity: 0.6,
-    jumpForce: -12,
+    gravity: 0.5,
+    jumpForce: -13.5,
     groundY: 0,
     couple: {
         x: 50,
         y: 0,
-        width: 95,   // Scaled to match background (646/746 ratio)
-        height: 110,
+        width: 95,   // Drawn width
+        height: 110, // Drawn height
+        hitWidth: 45, // Inner hitbox width
+        hitHeight: 80, // Inner hitbox height
         dy: 0,
         isJumping: false
     },
@@ -1150,7 +1152,10 @@ const ParkGame = {
     assets: {
         bg: new Image(),
         couple: new Image(),
-        items: new Image()
+        globo: new Image(),
+        pretzel: new Image(),
+        ardilla: new Image(),
+        ciclista: new Image()
     },
 
     init() {
@@ -1163,6 +1168,10 @@ const ParkGame = {
         // Load assets
         this.assets.bg.src = 'assets/central-park-bg.png';
         this.assets.couple.src = 'assets/couple.png';
+        this.assets.globo.src = 'assets/globo.png';
+        this.assets.pretzel.src = 'assets/pretzel.png';
+        this.assets.ardilla.src = 'assets/ardilla.png';
+        this.assets.ciclista.src = 'assets/ciclista.png';
 
         console.log('[Park] Initialized');
     },
@@ -1279,15 +1288,54 @@ const ParkGame = {
             const type = isBad ? (Math.random() < 0.5 ? 'squirrel' : 'cyclist') : (Math.random() < 0.5 ? 'balloon' : 'pretzel');
 
             let y = this.groundY - 40; // Default Low
+
+            let drawW = 40, drawH = 40;
+            let hitW = 40, hitH = 40;
+            let hitOffsetX = 0, hitOffsetY = 0;
+
             if (type === 'balloon') {
+                // globo.png (210x335 -> approx 40x63 renderer)
+                drawW = 40; drawH = 63;
+                hitW = 30; hitH = 30;
+                hitOffsetX = 5; hitOffsetY = 5; // Hitbox at the top/head of balloon
                 y = this.groundY - 150; // High
+            } else if (type === 'pretzel') {
+                // pretzel.png (100x77 -> approx 40x30 renderer)
+                drawW = 40; drawH = 30;
+                hitW = 35; hitH = 25;
+                hitOffsetX = 2; hitOffsetY = 2;
+                y = this.groundY - 30; // Slightly lower
+            } else if (type === 'squirrel') {
+                // ardilla.png (100x100), make it 60x60
+                drawW = 60; drawH = 60;
+                hitW = 60; hitH = 60;
+                hitOffsetX = 20; hitOffsetY = 35; // Bottom centered
+                y = this.groundY - 60;
+            } else if (type === 'cyclist') {
+                // ciclista.png (447x438) has a lot of transparent area,
+                // so we draw it larger to look visually similar to the couple.
+                drawH = Math.round(this.couple.height * 0.8);
+                drawW = Math.round(drawH * (447 / 438));
+
+                // Keep collision fair with an inner hitbox (not full sprite bounds)
+                hitW = Math.round(drawW * 0.55);
+                hitH = Math.round(drawH * 0.55);
+                hitOffsetX = Math.round((drawW - hitW) / 2);
+                hitOffsetY = Math.round(drawH - hitH - 10);
+
+                // Ground-align cyclist to the path
+                y = this.groundY - drawH;
             }
 
             this.items.push({
                 x: this.canvas.width,
                 y: y,
-                width: 40,
-                height: 40,
+                width: drawW,
+                height: drawH,
+                hitX: hitOffsetX,
+                hitY: hitOffsetY,
+                hitW: hitW,
+                hitH: hitH,
                 type: type,
                 isBad: isBad
             });
@@ -1320,12 +1368,17 @@ const ParkGame = {
                 continue;
             }
 
-            // Collision
+            // Collision using smaller hitboxes
+            const coupleHitX = this.couple.x + (this.couple.width - this.couple.hitWidth) / 2;
+            const coupleHitY = this.couple.y + (this.couple.height - this.couple.hitHeight); // Bottom aligned
+            const itemHitX = item.x + item.hitX;
+            const itemHitY = item.y + item.hitY;
+
             if (
-                this.couple.x < item.x + item.width &&
-                this.couple.x + this.couple.width > item.x &&
-                this.couple.y < item.y + item.height &&
-                this.couple.y + this.couple.height > item.y
+                coupleHitX < itemHitX + item.hitW &&
+                coupleHitX + this.couple.hitWidth > itemHitX &&
+                coupleHitY < itemHitY + item.hitH &&
+                coupleHitY + this.couple.hitHeight > itemHitY
             ) {
                 // Hit!
                 if (item.isBad) {
@@ -1389,30 +1442,34 @@ const ParkGame = {
 
         // Draw Items
         for (const item of this.items) {
-            if (item.isBad) {
-                ctx.fillStyle = '#8B0000'; // Dark Red
-                if (item.type === 'squirrel') ctx.fillStyle = '#A0522D'; // Brown
+            let img = null;
+            if (item.type === 'squirrel') img = this.assets.ardilla;
+            else if (item.type === 'cyclist') img = this.assets.ciclista;
+            else if (item.type === 'pretzel') img = this.assets.pretzel;
+            else if (item.type === 'balloon') img = this.assets.globo;
 
-                // Draw Bad Item
-                ctx.fillRect(item.x, item.y, item.width, item.height);
-
-                // Label
-                ctx.fillStyle = '#FFF';
-                ctx.font = '10px monospace';
-                ctx.fillText('BAD', item.x, item.y - 5);
+            if (img && img.complete && img.naturalWidth !== 0) {
+                ctx.drawImage(img, item.x, item.y, item.width, item.height);
             } else {
-                ctx.fillStyle = '#FFA500'; // Orange
-                if (item.type === 'balloon') {
-                    ctx.fillStyle = '#FF4500'; // Red Balloon
-                    // String
-                    ctx.beginPath();
-                    ctx.moveTo(item.x + item.width / 2, item.y + item.height);
-                    ctx.lineTo(item.x + item.width / 2, item.y + item.height + 20);
-                    ctx.stroke();
+                // Fallback geometry if not loaded
+                if (item.isBad) {
+                    ctx.fillStyle = '#8B0000'; // Dark Red
+                    if (item.type === 'squirrel') ctx.fillStyle = '#A0522D'; // Brown
+                    ctx.fillRect(item.x, item.y, item.width, item.height);
+                    ctx.fillStyle = '#FFF';
+                    ctx.font = '10px monospace';
+                    ctx.fillText('BAD', item.x, item.y - 5);
+                } else {
+                    ctx.fillStyle = '#FFA500'; // Orange
+                    if (item.type === 'balloon') {
+                        ctx.fillStyle = '#FF4500'; // Red Balloon
+                        ctx.beginPath();
+                        ctx.moveTo(item.x + item.width / 2, item.y + item.height);
+                        ctx.lineTo(item.x + item.width / 2, item.y + item.height + 20);
+                        ctx.stroke();
+                    }
+                    ctx.fillRect(item.x, item.y, item.width, item.height);
                 }
-
-                // Draw Good Item
-                ctx.fillRect(item.x, item.y, item.width, item.height);
             }
         }
     },
