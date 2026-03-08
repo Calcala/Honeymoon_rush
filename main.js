@@ -30,9 +30,15 @@ function positionDoorHitboxes() {
     const vpW = hubEl.clientWidth;
     const vpH = hubEl.clientHeight;
 
-    // Source image is 640×640 (square)
-    const imgW = 640;
-    const imgH = 640;
+    // Safari/iOS can briefly report 0 during first layout pass.
+    if (!vpW || !vpH) {
+        requestAnimationFrame(positionDoorHitboxes);
+        return;
+    }
+
+    // Prefer real source dimensions when available.
+    const imgW = bgImg.naturalWidth || 640;
+    const imgH = bgImg.naturalHeight || 640;
     const imgRatio = imgW / imgH; // 1.0
     const vpRatio = vpW / vpH;
 
@@ -65,6 +71,8 @@ function positionDoorHitboxes() {
         const y1 = parseFloat(btn.dataset.imgY1);
         const y2 = parseFloat(btn.dataset.imgY2);
 
+        if ([x1, x2, y1, y2].some(Number.isNaN)) return;
+
         const topLeft = imgToScreen(x1, y1);
         const botRight = imgToScreen(x2, y2);
 
@@ -72,6 +80,10 @@ function positionDoorHitboxes() {
         const top = topLeft.y;
         const width = botRight.x - topLeft.x;
         const height = botRight.y - topLeft.y;
+
+        if (!Number.isFinite(left) || !Number.isFinite(top) || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+            return;
+        }
 
         btn.style.left = `${left}px`;
         btn.style.top = `${top}px`;
@@ -82,13 +94,15 @@ function positionDoorHitboxes() {
 
 function setupDoorPositioning() {
     // Initial positioning (may fire before image loads, so also listen for load)
-    positionDoorHitboxes();
+    requestAnimationFrame(positionDoorHitboxes);
     const bgImg = document.querySelector('.hub-bg');
-    if (bgImg && !bgImg.complete) {
+    if (bgImg) {
         bgImg.addEventListener('load', positionDoorHitboxes);
     }
     // Re-position on resize / orientation change
     window.addEventListener('resize', positionDoorHitboxes);
+    window.visualViewport?.addEventListener('resize', positionDoorHitboxes);
+    window.visualViewport?.addEventListener('scroll', positionDoorHitboxes);
     window.addEventListener('orientationchange', () => {
         setTimeout(positionDoorHitboxes, 150);
     });
@@ -96,6 +110,7 @@ function setupDoorPositioning() {
 
 // --- Constants ---
 const STORAGE_KEY = 'honeymoon_rush_state';
+let isAudioUnlocked = false;
 
 // --- Game State ---
 const GameState = {
@@ -252,19 +267,25 @@ function resetState() {
     // alert("Progreso reiniciado."); // Removed repetitive alert, intro restart is enough feedback
 }
 
-// Debug button listener
-document.getElementById('debug-reset-btn')?.addEventListener('click', (e) => {
-    e.stopPropagation(); // Prevent ensuring clicks on hub background if any
-    if (confirm("¿Seguro que quieres borrar todo el progreso?")) {
-        resetState();
-    }
-});
+
 
 function playBGMHub() {
     const bgmHub = document.getElementById('bgm-hub');
-    if (bgmHub) {
-        bgmHub.volume = 0.3;
-        bgmHub.play().catch(e => console.log("BGM Hub play failed", e));
+    if (!bgmHub) return;
+
+    // Chrome/Safari autoplay policy: don't attempt before first user activation.
+    const hasUserActivation = navigator.userActivation?.hasBeenActive || isAudioUnlocked;
+    if (!hasUserActivation) return;
+
+    bgmHub.volume = 0.3;
+    const playPromise = bgmHub.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch((e) => {
+            // Expected when browser still blocks autoplay in edge timing cases.
+            if (e?.name !== 'NotAllowedError') {
+                console.log('BGM Hub play failed', e);
+            }
+        });
     }
 }
 
@@ -291,6 +312,8 @@ function navigateTo(screenId) {
         // Handle Hub BGM logic
         if (screenId === 'hub') {
             playBGMHub();
+            requestAnimationFrame(positionDoorHitboxes);
+            setTimeout(positionDoorHitboxes, 120);
         } else {
             stopBGMHub();
         }
@@ -1633,18 +1656,16 @@ function setupEventListeners() {
     ParkGame.init();
 
     // --- Audio Auto-Play Handling ---
-    // Start Hub music on first user interaction (to bypass browser autoplay policy)
+    // Unlock audio on first user interaction, then play hub music if hub is active.
     const handleFirstInteraction = () => {
+        isAudioUnlocked = true;
         const hubScreen = document.getElementById('hub');
         if (hubScreen && hubScreen.classList.contains('active')) {
             playBGMHub();
         }
-        // Remove listeners after first use
-        document.removeEventListener('click', handleFirstInteraction);
-        document.removeEventListener('touchstart', handleFirstInteraction);
     };
-    document.addEventListener('click', handleFirstInteraction);
-    document.addEventListener('touchstart', handleFirstInteraction);
+    document.addEventListener('pointerdown', handleFirstInteraction, { once: true, passive: true });
+    document.addEventListener('keydown', handleFirstInteraction, { once: true });
 }
 
 // --- Initialization ---
